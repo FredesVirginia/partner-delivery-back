@@ -1,4 +1,10 @@
-import { Injectable, OnModuleInit, Logger, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  OnModuleInit,
+  Logger,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { Client, LocalAuth } from 'whatsapp-web.js';
 import * as qrcode from 'qrcode-terminal';
 import { ChatGateway } from './chat.gateway';
@@ -9,7 +15,7 @@ export class WhatsappService implements OnModuleInit {
 
   constructor(
     @Inject(forwardRef(() => ChatGateway))
-  private readonly chatGateway: ChatGateway
+    private readonly chatGateway: ChatGateway,
   ) {
     //INICIAMOS EL CLIENTE DE Whastsapp SIMULANDO UN NAVEGADOR OCULTO
     this.client = new Client({
@@ -35,47 +41,56 @@ export class WhatsappService implements OnModuleInit {
 
     // 2. Evento cuando se conecta exitosamente
     this.client.on('ready', async () => {
-     this.logger.log('¡El bot de WhatsApp está LISTO y conectado! 🚀');
-      
+      this.logger.log('¡El bot de WhatsApp está LISTO y conectado! 🚀');
+
       // PRUEBA FUGAZ: Pon un número real tuyo con el código de país (ej: '54911...' para Argentina)
       // ¡No uses el signo '+' ni guiones!
-     const numeroPrueba = '5492966469771';
-      
+      const numeroPrueba = '5492966469771';
+
       this.logger.log('Enviando mensaje de prueba...');
-      await this.sendMessage(numeroPrueba, '¡Hola! Soy tu backend de NestJS probando los motores. 🤖📦');
+      await this.sendMessage(
+        numeroPrueba,
+        '¡Hola! Soy tu backend de NestJS probando los motores. 🤖📦',
+      );
     });
 
     // 4. Evento que escucha TODOS los mensajes entrantes
     this.client.on('message', async (msg) => {
       const texto = msg.body.trim();
-      
+
       // Verificamos si el mensaje empieza con nuestro comando mágico
       if (texto.startsWith('/precio')) {
-        this.logger.log(`¡Comando de cotización detectado de parte de: ${msg.from}!`);
-        
+        this.logger.log(
+          `¡Comando de cotización detectado de parte de: ${msg.from}!`,
+        );
+
         // Expresión regular para extraer solo los números del mensaje
         // Esto entenderá tanto "/precio 1500" como "/precio1500"
         const coincidenciaPrecio = texto.match(/\/precio\s*(\d+)/);
-        
+
         if (coincidenciaPrecio) {
           const precioExtraido = parseInt(coincidenciaPrecio[1], 10);
           this.logger.log(`Monto cotizado encontrado: $${precioExtraido}`);
-          
+
           // TODO: Aquí dispararemos el evento de NestJS para avisar al módulo de pagos y al chat web.
           // Por ahora, le respondemos a tu amiga para confirmar que el bot entendió.
-          await msg.reply(`✅ Entendido. Registré el precio de $${precioExtraido}. Generando link de pago...`);
+          await msg.reply(
+            `✅ Entendido. Registré el precio de $${precioExtraido}. Generando link de pago...`,
+          );
         } else {
-          await msg.reply('❌ Formato incorrecto. Por favor escribe: /precio [monto] (ejemplo: /precio 1200)');
+          await msg.reply(
+            '❌ Formato incorrecto. Por favor escribe: /precio [monto] (ejemplo: /precio 1200)',
+          );
         }
       }
     });
 
     this.client.on('message_create', async (msg) => {
       const texto = msg.body.trim();
-      
+
       if (texto.startsWith('/precio')) {
         const coincidenciaPrecio = texto.match(/\/precio\s*(\d+)/);
-        
+
         if (coincidenciaPrecio) {
           const precioExtraido = parseInt(coincidenciaPrecio[1], 10);
           this.logger.log(`Monto cotizado encontrado: $${precioExtraido}`);
@@ -88,12 +103,16 @@ export class WhatsappService implements OnModuleInit {
           this.chatGateway.server.to(orderIdSimulado).emit('price_quoted', {
             orderId: orderIdSimulado,
             price: precioExtraido,
-            status: 'QUOTED'
+            status: 'QUOTED',
           });
 
-          this.logger.log(`Transmitido precio de $${precioExtraido} a la sala de socket: ${orderIdSimulado}`);
+          this.logger.log(
+            `Transmitido precio de $${precioExtraido} a la sala de socket: ${orderIdSimulado}`,
+          );
 
-          await msg.reply(`✅ Entendido. Registré el precio de $${precioExtraido}. Transmitiendo a la web...`);
+          await msg.reply(
+            `✅ Entendido. Registré el precio de $${precioExtraido}. Transmitiendo a la web...`,
+          );
         }
       }
     });

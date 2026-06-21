@@ -1,11 +1,11 @@
 import { IsNotEmpty, IsString } from 'class-validator';
 
 export class CreateOrderDto {
-    @IsNotEmpty()
+    @IsNotEmpty({message: "El nombre del cliente es obligatorio"})
     @IsString()
     clientName: string;
     
-    @IsNotEmpty()
+    @IsNotEmpty({message: "El teléfono del cliente es obligatorio"})
     @IsString()
     clientPhone: string;
     
