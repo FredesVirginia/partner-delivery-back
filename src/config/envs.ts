@@ -4,6 +4,7 @@ import * as joi from 'joi';
 interface EnvVars {
   DB_HOST: string;
   DB_PORT: number;
+  MP_ACCESS_TOKEN: string;
   DB_USER: string;
   DB_PASSWORD: string;
   DB_NAME: string;
@@ -16,6 +17,7 @@ const envsShema = joi
     DB_USER: joi.string().required(),
     DB_PASSWORD: joi.string().required(),
     DB_NAME: joi.string().required(),
+    MP_ACCESS_TOKEN: joi.string().required(),
   })
   .unknown(true);
 
@@ -35,4 +37,5 @@ export const envs = {
   dbName: envVars.DB_NAME,
   dbPassword: envVars.DB_PASSWORD,
   dbUser: envVars.DB_USER,
+  mpAccessToken: envVars.MP_ACCESS_TOKEN,
 };

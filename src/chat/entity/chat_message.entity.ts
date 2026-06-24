@@ -21,8 +21,6 @@ export class ChatMessage {
     @CreateDateColumn()
     createdAt: Date;
 
-    @ManyToOne(() => Order, (order) => order.chatMessages)
-    @JoinColumn({name:"order_id"})
-    order: Order;
+
 
 }

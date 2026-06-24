@@ -1,15 +1,16 @@
-import { 
-  WebSocketGateway, 
-  WebSocketServer, 
-  SubscribeMessage, 
-  OnGatewayConnection, 
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  OnGatewayConnection,
   OnGatewayDisconnect,
   MessageBody,
-  ConnectedSocket
+  ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { forwardRef, Inject, Logger } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
+import { OrderService } from '../orders/order.service';
 
 // El decorador configura el Gateway. Habilitamos CORS para que tu Front (React) pueda conectarse sin bloqueos.
 @WebSocketGateway({
@@ -19,9 +20,11 @@ import { WhatsappService } from './whatsapp.service';
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
-  @Inject(forwardRef(() => WhatsappService))
-  private readonly whatsappService: WhatsappService
-) {}
+    @Inject(forwardRef(() => WhatsappService))
+    private readonly whatsappService: WhatsappService,
+    @Inject(forwardRef(() => OrderService))
+    private readonly orderService: OrderService,
+  ) {}
   @WebSocketServer()
   server: Server; // Esta variable nos da acceso a todo el servidor de Socket.io
 
@@ -44,15 +47,44 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('join_order')
   handleJoinOrder(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { orderId: string }
+    @MessageBody() data: { orderId: string },
   ) {
     if (!data.orderId) return;
 
     // Metemos al cliente en la sala exclusiva de su UUID de orden
     client.join(data.orderId);
-    this.logger.log(`Cliente ${client.id} se unió a la sala de la orden: ${data.orderId}`);
-    
+    this.logger.log(
+      `Cliente ${client.id} se unió a la sala de la orden: ${data.orderId}`,
+    );
+
     // Le confirmamos al cliente que ya está adentro
     client.emit('joined_room', { room: data.orderId });
+  }
+
+  @SubscribeMessage('send_message')
+  async handleSendMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: { orderId: any; sender: 'CLIENT' | 'ADMIN'; text: string },
+  ) {
+    try {
+      if (!data.orderId || !data.text) return;
+      //GUATDAMOS EL MENSAJE EN POSTGRESS
+      const saveMessage = await this.orderService.saveMessage(
+        data.orderId,
+        data.sender,
+        data.text,
+      );
+      // 2. Le transmitimos el mensaje a TODOS los que estén sintonizando esa sala de la orden
+      // Esto incluye a la otra punta (si el cliente escribió, le llega al panel de tu amiga, y viceversa)
+      this.server.to(data.orderId.toString()).emit('new_message', saveMessage);
+
+      this.logger.log(
+        `Mensaje de [${data.sender}] transmitido en sala ${data.orderId}`,
+      );
+    } catch (error) {
+      this.logger.error(error.message, error.stack);
+      throw error;
+    }
   }
 }

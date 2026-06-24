@@ -5,9 +5,10 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
-import { Client, LocalAuth } from 'whatsapp-web.js';
+import { Client, LocalAuth, Message } from 'whatsapp-web.js';
 import * as qrcode from 'qrcode-terminal';
 import { ChatGateway } from './chat.gateway';
+import { OrderService } from '../orders/order.service';
 @Injectable()
 export class WhatsappService implements OnModuleInit {
   private client: Client;
@@ -16,6 +17,8 @@ export class WhatsappService implements OnModuleInit {
   constructor(
     @Inject(forwardRef(() => ChatGateway))
     private readonly chatGateway: ChatGateway,
+    @Inject(forwardRef(() => OrderService))
+    private readonly orderService: OrderService,
   ) {
     //INICIAMOS EL CLIENTE DE Whastsapp SIMULANDO UN NAVEGADOR OCULTO
     this.client = new Client({
@@ -95,24 +98,49 @@ export class WhatsappService implements OnModuleInit {
           const precioExtraido = parseInt(coincidenciaPrecio[1], 10);
           this.logger.log(`Monto cotizado encontrado: $${precioExtraido}`);
 
-          // ⚠️ NOTA TEMPORAL: Como todavía no recuperamos el orderId real de la base de datos,
-          // vamos a inventar un "order_id_de_prueba" simulado para testear el flujo del socket.
-          const orderIdSimulado = 'orden-prueba-123';
+          // 1. Verificar si el mensaje es una respuesta (reply) a otro mensaje
+          if (msg.hasQuotedMsg) {
+            const msgCitado = await msg.getQuotedMessage();
+            const idMensajeOriginal = msgCitado.id._serialized; // El ID del mensaje que el bot mandó primero
 
-          // Emitimos el precio en tiempo real a la sala de esa orden en el Front
-          this.chatGateway.server.to(orderIdSimulado).emit('price_quoted', {
-            orderId: orderIdSimulado,
-            price: precioExtraido,
-            status: 'QUOTED',
-          });
+            this.logger.log(
+              `Buscando orden para el mensaje citado: ${idMensajeOriginal}`,
+            );
 
-          this.logger.log(
-            `Transmitido precio de $${precioExtraido} a la sala de socket: ${orderIdSimulado}`,
-          );
+            // 2. Buscamos y actualizamos la orden en Postgres con el precio real
+            const ordenActualizada =
+              await this.orderService.updatePriceByMessageId(
+                idMensajeOriginal,
+                precioExtraido,
+              );
 
-          await msg.reply(
-            `✅ Entendido. Registré el precio de $${precioExtraido}. Transmitiendo a la web...`,
-          );
+            if (ordenActualizada) {
+              // 3. Emitimos el precio EN VIVO por WebSockets usando el UUID REAL de la orden
+              this.chatGateway.server
+                .to(ordenActualizada.id.toString())
+                .emit('price_quoted', {
+                  orderId: ordenActualizada.id,
+                  price: ordenActualizada.deliveryPrice,
+                  status: ordenActualizada.status,
+                  mpLink: ordenActualizada.mpPreference
+                });
+
+              this.logger.log(
+                `¡Transmitido con éxito al socket de la orden REAL: ${ordenActualizada.id}!`,
+              );
+              await msg.reply(
+                `✅ ¡Perfecto! Registrado precio de $${precioExtraido} para la orden de ${ordenActualizada.clientName}. Transmitido a la web.`,
+              );
+            } else {
+              await msg.reply(
+                `❌ No encontré ninguna orden activa vinculada a este mensaje.`,
+              );
+            }
+          } else {
+            await msg.reply(
+              `💡 Por favor, responde (manten presionando y dale a 'Responder') al mensaje del pedido para que sepa qué orden estás cotizando.`,
+            );
+          }
         }
       }
     });
@@ -131,7 +159,7 @@ export class WhatsappService implements OnModuleInit {
    * @param to Número de teléfono destino (ej: '5491123456789')
    * @param body El texto del mensaje que se va a enviar
    */
-  async sendMessage(to: string, body: string): Promise<boolean> {
+  async sendMessage(to: string, body: string): Promise<Message | null> {
     try {
       // Limpiamos el número por si viene con espacios, guiones o un '+'
       const cleanNumber = to.replace(/\D/g, '');
@@ -140,13 +168,13 @@ export class WhatsappService implements OnModuleInit {
       const whatsappId = `${cleanNumber}@c.us`;
 
       // Enviamos el mensaje usando el cliente de la librería
-      await this.client.sendMessage(whatsappId, body);
+      const sentMessage = await this.client.sendMessage(whatsappId, body);
 
       this.logger.log(`Mensaje enviado con éxito a: ${whatsappId}`);
-      return true;
+      return sentMessage;
     } catch (error) {
       this.logger.error(`Error al enviar mensaje a ${to}:`, error);
-      return false;
+      return null;
     }
   }
 }

@@ -13,6 +13,7 @@ import { ConfigModule } from '@nestjs/config';
     OrdersModule,
     ChatModule,
     PaymentsModule,
+    PaymentsModule,
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: envs.dbHost,
