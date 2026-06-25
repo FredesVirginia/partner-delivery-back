@@ -8,7 +8,7 @@ import { Message } from './entity/message.entity';
 import { PaymentsModule } from '../payments/payments.module';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Order , Message]), forwardRef(() => ChatModule), PaymentsModule],
+    imports: [TypeOrmModule.forFeature([Order , Message]), forwardRef(() => ChatModule), forwardRef(() => PaymentsModule)],
     controllers: [OrderController],
     providers: [OrderService],
     exports: [OrderService],

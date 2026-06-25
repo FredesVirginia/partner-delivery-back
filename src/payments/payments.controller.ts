@@ -20,6 +20,28 @@ export class PaymentsController {
   }
 
   /**
+   * 1b. Redirección cuando el pago queda PENDIENTE (ej: efectivo / cupón Pago Fácil)
+   */
+  @Get('pending')
+  async handlePending(@Query('orderId') orderId: string, @Res() res: Response) {
+    return res.status(HttpStatus.OK).send(`
+      <h1>Pago pendiente ⏳</h1>
+      <p>Generamos el cupón para la orden #${orderId}. Cuando lo pagues en el local, se confirma solo. Podés cerrar esta pestaña.</p>
+    `);
+  }
+
+  /**
+   * 1c. Redirección cuando el pago FALLA o se rechaza
+   */
+  @Get('failure')
+  async handleFailure(@Query('orderId') orderId: string, @Res() res: Response) {
+    return res.status(HttpStatus.OK).send(`
+      <h1>El pago no se pudo completar ❌</h1>
+      <p>Hubo un problema con el pago de la orden #${orderId}. Podés volver al chat e intentar de nuevo.</p>
+    `);
+  }
+
+  /**
    * 2. El Webhook (Notificación Polling / IPN)
    * ¡Este es el importante! Mercado Pago le pega a este POST de forma asíncrona
    */

@@ -6,6 +6,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhatsappService } from 'src/chat/whatsapp.service';
 import { PaymentsService } from 'src/payments/payments.service';
+import { ChatGateway } from 'src/chat/chat.gateway';
 @Injectable()
 export class OrderService {
   private readonly logger = new Logger(OrderService.name);
@@ -18,6 +19,7 @@ export class OrderService {
 
     private readonly whatsappService: WhatsappService,
     private readonly paymentService : PaymentsService,
+    private readonly chatGateway: ChatGateway,
   ) {}
 
   async create(createOrderDto: CreateOrderDto): Promise<Order> {
@@ -116,6 +118,29 @@ export class OrderService {
     }catch(error){
         this.logger.error(error.message, error.stack);
         throw error;
+    }
+  }
+
+
+  async markAsPaid(orderId: any): Promise<void> {
+    try {
+      const order = await this.orderRepository.findOne({ where: { id: orderId } });
+      if (order) {
+        order.status = 'PAID' as any; // Pasamos a pagado 
+        await this.orderRepository.save(order);
+        
+        // 🚀 ¡Avisamos en tiempo real por el socket que ya está pago!
+        // Evento propio (NO 'price_quoted') para no pisar la lógica del botón de pago.
+        this.chatGateway.server.to(orderId.toString()).emit('order_paid', {
+          orderId: order.id,
+          price: order.deliveryPrice,
+          status: 'PAID',
+        });
+
+        this.logger.log(`📢 Orden #${orderId} marcada como PAGADA y notificada por Sockets.`);
+      }
+    } catch (error) {
+      this.logger.error(`Error al marcar como paga la orden ${orderId}`, error);
     }
   }
 }

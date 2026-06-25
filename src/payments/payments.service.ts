@@ -56,16 +56,19 @@ export class PaymentsService {
               currency_id: 'ARS', // Moneda nacional de Argentina 🇦🇷
             },
           ],
-          // URLs a las que MP redirigirá al cliente según el resultado
+          // URLs a las que MP redirigirá al cliente según el resultado.
+          // Usan PUBLIC_URL (ngrok/dominio) y las rutas REALES del PaymentsController (/payments/...).
           back_urls: {
-            success: `http://localhost:3000/orders/payment/success?orderId=${orderId}`,
-            failure: `http://localhost:3000/orders/payment/failure?orderId=${orderId}`,
-            pending: `http://localhost:3000/orders/payment/pending?orderId=${orderId}`,
+            success: `${envs.publicUrl}/payments/success?orderId=${orderId}`,
+            failure: `${envs.publicUrl}/payments/failure?orderId=${orderId}`,
+            pending: `${envs.publicUrl}/payments/pending?orderId=${orderId}`,
           },
-          // OJO: 'auto_return' exige que back_urls.success sea una URL pública (no localhost).
-          // Mientras probás en local lo dejamos comentado. Para producción (o con ngrok/https),
-          // reactivá esta línea y poné una URL pública en back_urls.success.
-          // auto_return: 'approved',
+          // Webhook asíncrono: MP avisa acá cuando el pago (incluido EFECTIVO) cambia de estado.
+          notification_url: `${envs.publicUrl}/payments/webhook`,
+          // 'auto_return' solo si PUBLIC_URL es una URL pública (no localhost): redirige solo al aprobar.
+          ...(envs.publicUrl.startsWith('https')
+            ? { auto_return: 'approved' as const }
+            : {}),
           external_reference: orderId.toString(), // Guardamos el ID de la orden para rastrearlo luego
         },
       });
@@ -87,25 +90,31 @@ export class PaymentsService {
   /**
    * Verifica el estado real del pago directamente con Mercado Pago
    */
+ /**
+   * Verifica el estado real del pago y actualiza el sistema en vivo
+   */
   async processWebhookNotification(paymentId: string) {
     try {
       const paymentClient = new Payment(this.mpClient);
-      
-      // Buscamos los datos oficiales del pago en los servidores de MP
       const paymentData = await paymentClient.get({ id: paymentId });
       
-      const orderId = paymentData.external_reference; // Te acordás que guardamos el orderId acá?
-      const status = paymentData.status; // 'approved', 'pending', etc.
+      const orderId = paymentData.external_reference; 
+      const status = paymentData.status; 
 
-      console.log(`🔍 Verificación de pago MP: Orden #${orderId} - Estado: ${status}`);
+      this.logger.log(`🔍 Verificación de pago MP: Orden #${orderId} - Estado: ${status}`);
 
       if (status === 'approved') {
-        console.log(`💰 ¡CONFIRMADO! El pago de la orden #${orderId} fue acreditado.`);
-        // TODO: Acá vamos a cambiar el estado de la orden a 'PAID' en Postgres
-        // y avisar por sockets al front.
+        this.logger.log(`💰 ¡CONFIRMADO! El pago de la orden #${orderId} fue acreditado.`);
+        
+        // 1. Buscamos la orden y le cambiamos el estado en Postgres a PAID
+        // En tu OrdersService podés crear un método simple que cambie el status o reusar la instancia del repositorio si lo hacés directo.
+        // Vamos a asumir que llamamos a un método en OrdersService:
+        await this.ordersService.markAsPaid(orderId);
       }
     } catch (error) {
-      console.error(`Error al procesar el pago del webhook ${paymentId}:`, error);
+      this.logger.error(`Error al procesar el pago del webhook ${paymentId}:`, error);
     }
   }
+
+  
 }
