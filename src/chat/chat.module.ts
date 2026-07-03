@@ -5,10 +5,11 @@ import { ChatGateway } from './chat.gateway';
 import { ChatMessage } from './entity/chat_message.entity';
 import { WhatsappSeccion } from './entity/whatsapp-seccion.entity';
 import { OrdersModule } from '../orders/orders.module';
+import { Message } from '../orders/entity/message.entity';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([ChatMessage, WhatsappSeccion]),
+        TypeOrmModule.forFeature([ChatMessage, WhatsappSeccion , Message]),
         forwardRef(() => OrdersModule),
     ],
     providers: [WhatsappService , ChatGateway],

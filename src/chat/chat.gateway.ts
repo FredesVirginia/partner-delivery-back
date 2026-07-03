@@ -1,16 +1,17 @@
+import { Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import {
-  WebSocketGateway,
-  WebSocketServer,
-  SubscribeMessage,
+  ConnectedSocket,
+  MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
-  MessageBody,
-  ConnectedSocket,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { forwardRef, Inject, Logger } from '@nestjs/common';
-import { WhatsappService } from './whatsapp.service';
-import { OrderService } from '../orders/order.service';
+import { Message } from 'src/orders/entity/message.entity';
+import { Repository } from 'typeorm';
 
 // El decorador configura el Gateway. Habilitamos CORS para que tu Front (React) pueda conectarse sin bloqueos.
 @WebSocketGateway({
@@ -20,10 +21,8 @@ import { OrderService } from '../orders/order.service';
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
-    @Inject(forwardRef(() => WhatsappService))
-    private readonly whatsappService: WhatsappService,
-    @Inject(forwardRef(() => OrderService))
-    private readonly orderService: OrderService,
+    @InjectRepository(Message)
+  private readonly messageRepository: Repository<Message>,
   ) {}
   @WebSocketServer()
   server: Server; // Esta variable nos da acceso a todo el servidor de Socket.io
@@ -70,11 +69,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       if (!data.orderId || !data.text) return;
       //GUATDAMOS EL MENSAJE EN POSTGRESS
-      const saveMessage = await this.orderService.saveMessage(
-        data.orderId,
-        data.sender,
-        data.text,
-      );
+      const saveMessage = await this.messageRepository.create({
+        orderId: data.orderId,
+        sender: data.sender,
+        text: data.text,
+      });
+      await this.messageRepository.save(saveMessage);
       // 2. Le transmitimos el mensaje a TODOS los que estén sintonizando esa sala de la orden
       // Esto incluye a la otra punta (si el cliente escribió, le llega al panel de tu amiga, y viceversa)
       this.server.to(data.orderId.toString()).emit('new_message', saveMessage);

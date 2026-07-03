@@ -1,10 +1,22 @@
-import { Controller, Get, Post, Query, Req, Res, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Query,
+  Req,
+  Res,
+  HttpStatus,
+} from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { Response, Request } from 'express';
+import { OrderService } from '../orders/order.service';
 
 @Controller('payments')
 export class PaymentsController {
-  constructor(private readonly paymentsService: PaymentsService) {}
+  constructor(
+    private readonly paymentsService: PaymentsService,
+    private readonly orderService: OrderService,
+  ) {}
 
   /**
    * 1. Redirección cuando el pago es EXITOSO
@@ -46,17 +58,27 @@ export class PaymentsController {
    * ¡Este es el importante! Mercado Pago le pega a este POST de forma asíncrona
    */
   @Post('webhook')
-  async handleWebhook(@Req() req: Request, @Query('topic') topic: string, @Res() res: Response) {
+  async handleWebhook(
+    @Req() req: Request,
+    @Query('topic') topic: string,
+    @Res() res: Response,
+  ) {
     const body = req.body;
 
     // Mercado Pago avisa de muchos eventos, a nosotros nos interesa "payment"
     if (topic === 'payment' || (body && body.type === 'payment')) {
       const paymentId = body.data?.id || body.resource?.split('/').pop();
-      
-      console.log(`📡 WEBHOOK RECIBIDO: Nuevo evento de pago con ID: ${paymentId}`);
-      
+
+      console.log(
+        `📡 WEBHOOK RECIBIDO: Nuevo evento de pago con ID: ${paymentId}`,
+      );
+
       // Llamamos a un método en el servicio para verificar el estado real de la plata
-      await this.paymentsService.processWebhookNotification(paymentId);
+      const orderId =
+        await this.paymentsService.processWebhookNotification(paymentId);
+      if (orderId) {
+        await this.orderService.markAsPaid(orderId); // Órdenes actualiza + emite el socket 'order_paid'
+      }
     }
 
     // SIEMPRE le respondemos un 200 OK a Mercado Pago para que sepa que recibimos el aviso

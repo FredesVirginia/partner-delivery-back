@@ -9,6 +9,8 @@ import { Client, LocalAuth, Message } from 'whatsapp-web.js';
 import * as qrcode from 'qrcode-terminal';
 import { ChatGateway } from './chat.gateway';
 import { OrderService } from '../orders/order.service';
+import { Order } from '../orders/entity/order.entity';
+
 @Injectable()
 export class WhatsappService implements OnModuleInit {
   private client: Client;
@@ -177,4 +179,30 @@ export class WhatsappService implements OnModuleInit {
       return null;
     }
   }
+
+  /**
+ * Notifica a la operadora que entró un pedido nuevo y guarda el ID del mensaje en la orden.
+ */
+async notifyNewOrder(order: Order): Promise<void> {
+  const numeroAmiga = '5492966572349';
+  const mensajeParaAmiga =
+    `📦 *¡NUEVO PEDIDO RECIBIDO!*\n\n` +
+    `👤 *Cliente:* ${order.clientName}\n` +
+    `📍 *Nombre del Lugar:* ${order.originName}\n` +
+    `📍 *Retira en:* ${order.originAddress}\n` +
+    `🏁 *Entrega en:* ${order.destinationAddress}\n` +
+    `📱 *Teléfono:* ${order.clientPhone}\n` +
+    `💬 *Notas:* ${order.details || 'Ninguna'}\n\n` +
+    `----------------------------------------\n` +
+    `🆔 *Order ID:* \`${order.id}\`\n\n` +
+    `💡 Responde a este mensaje con:\n` +
+    `*/precio [monto]* para cotizar el envío.`;
+
+  const infoMensaje = await this.sendMessage(numeroAmiga, mensajeParaAmiga);
+
+  if (infoMensaje && infoMensaje.id) {
+    await this.orderService.attachWhatsappMessageId(order.id, infoMensaje.id._serialized);
+  }
+}
+
 }

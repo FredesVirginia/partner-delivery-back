@@ -1,18 +1,13 @@
-import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { Injectable, Logger } from '@nestjs/common';
 import { MercadoPagoConfig, Payment, Preference } from 'mercadopago';
 import { envs } from 'src/config';
-import { OrderService } from 'src/orders/order.service';
 
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
   private mpClient: MercadoPagoConfig;
 
-  constructor(
-    @Inject(forwardRef(() => OrderService))
-    private readonly ordersService: OrderService,
-  ) {
+  constructor() {
     
     // Inicializamos el cliente oficial de Mercado Pago con el token de tu .env
     const accessToken = envs.mpAccessToken;
@@ -93,28 +88,28 @@ export class PaymentsService {
  /**
    * Verifica el estado real del pago y actualiza el sistema en vivo
    */
-  async processWebhookNotification(paymentId: string) {
-    try {
-      const paymentClient = new Payment(this.mpClient);
-      const paymentData = await paymentClient.get({ id: paymentId });
-      
-      const orderId = paymentData.external_reference; 
-      const status = paymentData.status; 
+ async processWebhookNotification(paymentId: string): Promise<string | null> {
+  try {
+    const paymentClient = new Payment(this.mpClient);
+    const paymentData = await paymentClient.get({ id: paymentId });
 
-      this.logger.log(`🔍 Verificación de pago MP: Orden #${orderId} - Estado: ${status}`);
+    const orderId = paymentData.external_reference;
+    const status = paymentData.status;
 
-      if (status === 'approved') {
-        this.logger.log(`💰 ¡CONFIRMADO! El pago de la orden #${orderId} fue acreditado.`);
-        
-        // 1. Buscamos la orden y le cambiamos el estado en Postgres a PAID
-        // En tu OrdersService podés crear un método simple que cambie el status o reusar la instancia del repositorio si lo hacés directo.
-        // Vamos a asumir que llamamos a un método en OrdersService:
-        await this.ordersService.markAsPaid(orderId);
-      }
-    } catch (error) {
-      this.logger.error(`Error al procesar el pago del webhook ${paymentId}:`, error);
+    this.logger.log(`🔍 Verificación de pago MP: Orden #${orderId} - Estado: ${status}`);
+
+    if (status === 'approved') {
+      this.logger.log(`💰 ¡CONFIRMADO! El pago de la orden #${orderId} fue acreditado.`);
+      return orderId ?? null; // Devolvemos el id; el controller marca la orden
     }
+
+    return null;
+  } catch (error) {
+    this.logger.error(`Error al procesar el pago del webhook ${paymentId}:`, error);
+    return null;
   }
+}
+
 
   
 }
