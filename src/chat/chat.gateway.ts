@@ -22,7 +22,7 @@ import { Repository } from 'typeorm';
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     @InjectRepository(Message)
-  private readonly messageRepository: Repository<Message>,
+    private readonly messageRepository: Repository<Message>,
   ) {}
   @WebSocketServer()
   server: Server; // Esta variable nos da acceso a todo el servidor de Socket.io

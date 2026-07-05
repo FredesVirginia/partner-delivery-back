@@ -2,19 +2,21 @@ import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { OrderService } from './order.service';
 import { WhatsappService } from '../chat/whatsapp.service';
 import { CreateOrderDto } from './dtos/order.dto';
+import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('orders') //Esto hace que todos los endpoits empiecen con orders
 export class OrderController {
-    constructor(
-        private readonly orderService: OrderService,
-        private readonly whatsappService: WhatsappService,
-    ) {}
+  constructor(
+    private readonly orderService: OrderService,
+    private readonly whatsappService: WhatsappService,
+  ) {}
 
-    @Post()
-    @HttpCode(HttpStatus.CREATED)//DEVUELE UN CODIGO 201 SI TODO SALE BIEN
-    async create(@Body() createOrderDto: CreateOrderDto) {
-        const order = await this.orderService.create(createOrderDto);
-        await this.whatsappService.notifyNewOrder(order); // Avisamos a la operadora
-        return order;
-    }
+  @Public()
+  @Post()
+  @HttpCode(HttpStatus.CREATED) //DEVUELE UN CODIGO 201 SI TODO SALE BIEN
+  async create(@Body() createOrderDto: CreateOrderDto) {
+    const order = await this.orderService.create(createOrderDto);
+    await this.whatsappService.notifyNewOrder(order); // Avisamos a la operadora
+    return order;
+  }
 }

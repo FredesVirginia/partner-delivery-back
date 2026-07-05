@@ -10,7 +10,11 @@ import {
 import { PaymentsService } from './payments.service';
 import { Response, Request } from 'express';
 import { OrderService } from '../orders/order.service';
+import { Public } from '../auth/decorators/public.decorator';
 
+// Todas estas rutas las consume Mercado Pago o el cliente sin sesión propia,
+// así que quedan públicas frente al guard global de auth.
+@Public()
 @Controller('payments')
 export class PaymentsController {
   constructor(

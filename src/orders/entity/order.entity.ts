@@ -1,9 +1,9 @@
 import {
-    Column,
-    CreateDateColumn,
-    Entity,
-    OneToMany,
-    PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  Entity,
+  OneToMany,
+  PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Message } from './message.entity';
 // import { ChatMessage } from '../../chat/entities/chat-message.entity'; // La enlazaremos pronto
@@ -69,8 +69,6 @@ export class Order {
   //   (chatMessage) => chatMessage.order   // 2. ¿Cómo me encuentra esa otra entidad desde ella?
   // )
 
-  
-
-  @OneToMany(()=>Message , (message)=>message.order)
-  messages : Message[]
+  @OneToMany(() => Message, (message) => message.order)
+  messages: Message[];
 }

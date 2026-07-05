@@ -4,9 +4,9 @@ import { PaymentsController } from './payments.controller';
 import { OrdersModule } from 'src/orders/orders.module';
 
 @Module({
-    imports: [forwardRef(() => OrdersModule)],
-    controllers: [PaymentsController],
-    providers: [PaymentsService],
-    exports: [PaymentsService],
+  imports: [forwardRef(() => OrdersModule)],
+  controllers: [PaymentsController],
+  providers: [PaymentsService],
+  exports: [PaymentsService],
 })
 export class PaymentsModule {}
