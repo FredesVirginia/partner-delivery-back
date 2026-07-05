@@ -34,6 +34,12 @@ export class WhatsappService implements OnModuleInit {
   }
 
   onModuleInit() {
+    // Permite levantar el backend sin el bot de WhatsApp (local/CI/tests):
+    // WA_DISABLED=true evita lanzar Puppeteer y el pareo por QR.
+    if (process.env.WA_DISABLED === 'true') {
+      this.logger.warn('WhatsApp deshabilitado (WA_DISABLED=true).');
+      return;
+    }
     this.initializeBot();
   }
 
@@ -124,7 +130,7 @@ export class WhatsappService implements OnModuleInit {
                   orderId: ordenActualizada.id,
                   price: ordenActualizada.deliveryPrice,
                   status: ordenActualizada.status,
-                  mpLink: ordenActualizada.mpPreference
+                  mpLink: ordenActualizada.mpPreference,
                 });
 
               this.logger.log(
@@ -181,28 +187,30 @@ export class WhatsappService implements OnModuleInit {
   }
 
   /**
- * Notifica a la operadora que entró un pedido nuevo y guarda el ID del mensaje en la orden.
- */
-async notifyNewOrder(order: Order): Promise<void> {
-  const numeroAmiga = '5492966572349';
-  const mensajeParaAmiga =
-    `📦 *¡NUEVO PEDIDO RECIBIDO!*\n\n` +
-    `👤 *Cliente:* ${order.clientName}\n` +
-    `📍 *Nombre del Lugar:* ${order.originName}\n` +
-    `📍 *Retira en:* ${order.originAddress}\n` +
-    `🏁 *Entrega en:* ${order.destinationAddress}\n` +
-    `📱 *Teléfono:* ${order.clientPhone}\n` +
-    `💬 *Notas:* ${order.details || 'Ninguna'}\n\n` +
-    `----------------------------------------\n` +
-    `🆔 *Order ID:* \`${order.id}\`\n\n` +
-    `💡 Responde a este mensaje con:\n` +
-    `*/precio [monto]* para cotizar el envío.`;
+   * Notifica a la operadora que entró un pedido nuevo y guarda el ID del mensaje en la orden.
+   */
+  async notifyNewOrder(order: Order): Promise<void> {
+    const numeroAmiga = '5492966572349';
+    const mensajeParaAmiga =
+      `📦 *¡NUEVO PEDIDO RECIBIDO!*\n\n` +
+      `👤 *Cliente:* ${order.clientName}\n` +
+      `📍 *Nombre del Lugar:* ${order.originName}\n` +
+      `📍 *Retira en:* ${order.originAddress}\n` +
+      `🏁 *Entrega en:* ${order.destinationAddress}\n` +
+      `📱 *Teléfono:* ${order.clientPhone}\n` +
+      `💬 *Notas:* ${order.details || 'Ninguna'}\n\n` +
+      `----------------------------------------\n` +
+      `🆔 *Order ID:* \`${order.id}\`\n\n` +
+      `💡 Responde a este mensaje con:\n` +
+      `*/precio [monto]* para cotizar el envío.`;
 
-  const infoMensaje = await this.sendMessage(numeroAmiga, mensajeParaAmiga);
+    const infoMensaje = await this.sendMessage(numeroAmiga, mensajeParaAmiga);
 
-  if (infoMensaje && infoMensaje.id) {
-    await this.orderService.attachWhatsappMessageId(order.id, infoMensaje.id._serialized);
+    if (infoMensaje && infoMensaje.id) {
+      await this.orderService.attachWhatsappMessageId(
+        order.id,
+        infoMensaje.id._serialized,
+      );
+    }
   }
-}
-
 }

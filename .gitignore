@@ -58,3 +58,15 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # WhatsApp Web session / Puppeteer browser profile (whatsapp-web.js)
 .wwebjs_auth/
 .wwebjs_cache/
+
+# AI agent skill stores (vendored/installed via the skills CLI — reinstalables desde skills-lock.json)
+.agents/
+.cline/
+.codebuddy/
+.continue/
+.kiro/
+
+# Skills vendorizadas dentro de .claude/skills (symlinks al store).
+# Mantenemos versionado el tooling propio del repo: skill-orchestrator, hooks y settings.
+.claude/skills/*
+!.claude/skills/skill-orchestrator/
