@@ -4,15 +4,18 @@ import { AppService } from './app.service';
 import { OrdersModule } from './orders/orders.module';
 import { ChatModule } from './chat/chat.module';
 import { PaymentsModule } from './payments/payments.module';
+import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { envs } from './config';
 import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
+    UsersModule,
+    AuthModule,
     OrdersModule,
     ChatModule,
-    PaymentsModule,
     PaymentsModule,
     TypeOrmModule.forRoot({
       type: 'postgres',
