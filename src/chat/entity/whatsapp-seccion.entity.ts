@@ -1,9 +1,4 @@
-import {
-    Column,
-    Entity,
-    PrimaryColumn,
-    UpdateDateColumn
-} from 'typeorm';
+import { Column, Entity, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 
 @Entity('whatsapp_seccion')
 export class WhatsappSeccion {

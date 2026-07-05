@@ -8,11 +8,11 @@ import { OrdersModule } from '../orders/orders.module';
 import { Message } from '../orders/entity/message.entity';
 
 @Module({
-    imports: [
-        TypeOrmModule.forFeature([ChatMessage, WhatsappSeccion , Message]),
-        forwardRef(() => OrdersModule),
-    ],
-    providers: [WhatsappService , ChatGateway],
-    exports : [WhatsappService , ChatGateway]
+  imports: [
+    TypeOrmModule.forFeature([ChatMessage, WhatsappSeccion, Message]),
+    forwardRef(() => OrdersModule),
+  ],
+  providers: [WhatsappService, ChatGateway],
+  exports: [WhatsappService, ChatGateway],
 })
 export class ChatModule {}

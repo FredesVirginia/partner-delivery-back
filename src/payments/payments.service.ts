@@ -8,7 +8,6 @@ export class PaymentsService {
   private mpClient: MercadoPagoConfig;
 
   constructor() {
-    
     // Inicializamos el cliente oficial de Mercado Pago con el token de tu .env
     const accessToken = envs.mpAccessToken;
 
@@ -85,31 +84,35 @@ export class PaymentsService {
   /**
    * Verifica el estado real del pago directamente con Mercado Pago
    */
- /**
+  /**
    * Verifica el estado real del pago y actualiza el sistema en vivo
    */
- async processWebhookNotification(paymentId: string): Promise<string | null> {
-  try {
-    const paymentClient = new Payment(this.mpClient);
-    const paymentData = await paymentClient.get({ id: paymentId });
+  async processWebhookNotification(paymentId: string): Promise<string | null> {
+    try {
+      const paymentClient = new Payment(this.mpClient);
+      const paymentData = await paymentClient.get({ id: paymentId });
 
-    const orderId = paymentData.external_reference;
-    const status = paymentData.status;
+      const orderId = paymentData.external_reference;
+      const status = paymentData.status;
 
-    this.logger.log(`🔍 Verificación de pago MP: Orden #${orderId} - Estado: ${status}`);
+      this.logger.log(
+        `🔍 Verificación de pago MP: Orden #${orderId} - Estado: ${status}`,
+      );
 
-    if (status === 'approved') {
-      this.logger.log(`💰 ¡CONFIRMADO! El pago de la orden #${orderId} fue acreditado.`);
-      return orderId ?? null; // Devolvemos el id; el controller marca la orden
+      if (status === 'approved') {
+        this.logger.log(
+          `💰 ¡CONFIRMADO! El pago de la orden #${orderId} fue acreditado.`,
+        );
+        return orderId ?? null; // Devolvemos el id; el controller marca la orden
+      }
+
+      return null;
+    } catch (error) {
+      this.logger.error(
+        `Error al procesar el pago del webhook ${paymentId}:`,
+        error,
+      );
+      return null;
     }
-
-    return null;
-  } catch (error) {
-    this.logger.error(`Error al procesar el pago del webhook ${paymentId}:`, error);
-    return null;
   }
-}
-
-
-  
 }
