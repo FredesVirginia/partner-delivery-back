@@ -6,12 +6,14 @@ import { Order } from './entity/order.entity';
 import { ChatModule } from '../chat/chat.module';
 import { Message } from './entity/message.entity';
 import { PaymentsModule } from '../payments/payments.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Order, Message]),
     forwardRef(() => ChatModule),
     forwardRef(() => PaymentsModule),
+    NotificationsModule,
   ],
   controllers: [OrderController],
   providers: [OrderService],

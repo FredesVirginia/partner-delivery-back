@@ -1,0 +1,28 @@
+{
+  "version": "0.2",
+  "language": "en,es",
+  "ignorePaths": [
+    "node_modules/**",
+    "dist/**",
+    ".wwebjs_auth/**",
+    "package-lock.json"
+  ],
+  "words": [
+    "argon",
+    "cadetería",
+    "Checkout",
+    "cotizada",
+    "cotizar",
+    "Cadetería",
+    "mercadopago",
+    "nestjs",
+    "Postgres",
+    "Puppeteer",
+    "qrcode",
+    "serialized",
+    "typeorm",
+    "webhook",
+    "whatsapp",
+    "wwebjs"
+  ]
+}

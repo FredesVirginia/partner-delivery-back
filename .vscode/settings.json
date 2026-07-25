@@ -2,5 +2,6 @@
   
    
   "workbench.iconTheme": "material-icon-theme",
-  "material-icon-theme.activeIconPack": "nest"
+  "material-icon-theme.activeIconPack": "nest",
+  
 }

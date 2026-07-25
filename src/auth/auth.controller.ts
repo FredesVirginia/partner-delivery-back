@@ -8,8 +8,8 @@ import {
 } from '@nestjs/common';
 import { User } from '../users/entity/user.entity';
 import { AuthService } from './auth.service';
-import { CurrentUser } from './decorators/current-user.decorator';
-import { Public } from './decorators/public.decorator';
+import { currentUser } from './decorators/current-user.decorator';
+import { accessPublic } from './decorators/public.decorator';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -18,21 +18,21 @@ import { RegisterDto } from './dto/register.dto';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Public()
+  @accessPublic()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
 
-  @Public()
+  @accessPublic()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
   }
 
-  @Public()
+  @accessPublic()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   refresh(@Body() dto: RefreshDto) {
@@ -41,12 +41,12 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async logout(@CurrentUser() user: User): Promise<void> {
+  async logout(@currentUser() user: User): Promise<void> {
     await this.authService.logout(user.id);
   }
 
-  @Get('me')
-  me(@CurrentUser() user: User): User {
+  @Get('profile')
+  profile(@currentUser() user: User): User {
     return user;
   }
 }

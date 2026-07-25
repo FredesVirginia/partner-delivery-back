@@ -1,16 +1,16 @@
 import { Module, forwardRef } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { WhatsappService } from './whatsapp.service';
-import { ChatGateway } from './chat.gateway';
-import { ChatMessage } from './entity/chat_message.entity';
-import { WhatsappSeccion } from './entity/whatsapp-seccion.entity';
+import { JwtModule } from '@nestjs/jwt';
 import { OrdersModule } from '../orders/orders.module';
-import { Message } from '../orders/entity/message.entity';
+import { UsersModule } from '../users/users.module';
+import { ChatGateway } from './chat.gateway';
+
+import { WhatsappService } from './whatsapp.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ChatMessage, WhatsappSeccion, Message]),
     forwardRef(() => OrdersModule),
+    JwtModule.register({}),
+    UsersModule,
   ],
   providers: [WhatsappService, ChatGateway],
   exports: [WhatsappService, ChatGateway],

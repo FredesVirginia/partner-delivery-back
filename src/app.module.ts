@@ -6,6 +6,7 @@ import { ChatModule } from './chat/chat.module';
 import { PaymentsModule } from './payments/payments.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { envs } from './config';
 import { ConfigModule } from '@nestjs/config';
@@ -17,6 +18,7 @@ import { ConfigModule } from '@nestjs/config';
     OrdersModule,
     ChatModule,
     PaymentsModule,
+    NotificationsModule,
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: envs.dbHost,
@@ -40,7 +42,7 @@ import { ConfigModule } from '@nestjs/config';
     // Servicio adicional para verificar la conexión
     {
       provide: 'DATABASE_CONNECTION_LOGGER',
-      useFactory: async () => {
+      useFactory: () => {
         const logger = new Logger('Database');
 
         setTimeout(() => {

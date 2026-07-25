@@ -10,6 +10,7 @@ import * as qrcode from 'qrcode-terminal';
 import { ChatGateway } from './chat.gateway';
 import { OrderService } from '../orders/order.service';
 import { Order } from '../orders/entity/order.entity';
+import { envs } from '../config';
 
 @Injectable()
 export class WhatsappService implements OnModuleInit {
@@ -36,10 +37,11 @@ export class WhatsappService implements OnModuleInit {
   onModuleInit() {
     // Permite levantar el backend sin el bot de WhatsApp (local/CI/tests):
     // WA_DISABLED=true evita lanzar Puppeteer y el pareo por QR.
-    if (process.env.WA_DISABLED === 'true') {
+    if (envs.waDisabled) {
       this.logger.warn('WhatsApp deshabilitado (WA_DISABLED=true).');
       return;
     }
+
     this.initializeBot();
   }
 
@@ -51,115 +53,81 @@ export class WhatsappService implements OnModuleInit {
     });
 
     // 2. Evento cuando se conecta exitosamente
-    this.client.on('ready', async () => {
-      this.logger.log('¡El bot de WhatsApp está LISTO y conectado! 🚀');
 
-      // PRUEBA FUGAZ: Pon un número real tuyo con el código de país (ej: '54911...' para Argentina)
-      // ¡No uses el signo '+' ni guiones!
-      const numeroPrueba = '5492966469771';
-
-      this.logger.log('Enviando mensaje de prueba...');
-      await this.sendMessage(
-        numeroPrueba,
-        '¡Hola! Soy tu backend de NestJS probando los motores. 🤖📦',
-      );
+    this.client.on('ready', () => {
+      void this.handleReady();
     });
 
-    // 4. Evento que escucha TODOS los mensajes entrantes
-    this.client.on('message', async (msg) => {
-      const texto = msg.body.trim();
-
-      // Verificamos si el mensaje empieza con nuestro comando mágico
-      if (texto.startsWith('/precio')) {
-        this.logger.log(
-          `¡Comando de cotización detectado de parte de: ${msg.from}!`,
-        );
-
-        // Expresión regular para extraer solo los números del mensaje
-        // Esto entenderá tanto "/precio 1500" como "/precio1500"
-        const coincidenciaPrecio = texto.match(/\/precio\s*(\d+)/);
-
-        if (coincidenciaPrecio) {
-          const precioExtraido = parseInt(coincidenciaPrecio[1], 10);
-          this.logger.log(`Monto cotizado encontrado: $${precioExtraido}`);
-
-          // TODO: Aquí dispararemos el evento de NestJS para avisar al módulo de pagos y al chat web.
-          // Por ahora, le respondemos a tu amiga para confirmar que el bot entendió.
-          await msg.reply(
-            `✅ Entendido. Registré el precio de $${precioExtraido}. Generando link de pago...`,
-          );
-        } else {
-          await msg.reply(
-            '❌ Formato incorrecto. Por favor escribe: /precio [monto] (ejemplo: /precio 1200)',
-          );
-        }
-      }
+    this.client.on('message_create', (msg) => {
+      void this.handleOwnMessage(msg);
     });
 
-    this.client.on('message_create', async (msg) => {
-      const texto = msg.body.trim();
-
-      if (texto.startsWith('/precio')) {
-        const coincidenciaPrecio = texto.match(/\/precio\s*(\d+)/);
-
-        if (coincidenciaPrecio) {
-          const precioExtraido = parseInt(coincidenciaPrecio[1], 10);
-          this.logger.log(`Monto cotizado encontrado: $${precioExtraido}`);
-
-          // 1. Verificar si el mensaje es una respuesta (reply) a otro mensaje
-          if (msg.hasQuotedMsg) {
-            const msgCitado = await msg.getQuotedMessage();
-            const idMensajeOriginal = msgCitado.id._serialized; // El ID del mensaje que el bot mandó primero
-
-            this.logger.log(
-              `Buscando orden para el mensaje citado: ${idMensajeOriginal}`,
-            );
-
-            // 2. Buscamos y actualizamos la orden en Postgres con el precio real
-            const ordenActualizada =
-              await this.orderService.updatePriceByMessageId(
-                idMensajeOriginal,
-                precioExtraido,
-              );
-
-            if (ordenActualizada) {
-              // 3. Emitimos el precio EN VIVO por WebSockets usando el UUID REAL de la orden
-              this.chatGateway.server
-                .to(ordenActualizada.id.toString())
-                .emit('price_quoted', {
-                  orderId: ordenActualizada.id,
-                  price: ordenActualizada.deliveryPrice,
-                  status: ordenActualizada.status,
-                  mpLink: ordenActualizada.mpPreference,
-                });
-
-              this.logger.log(
-                `¡Transmitido con éxito al socket de la orden REAL: ${ordenActualizada.id}!`,
-              );
-              await msg.reply(
-                `✅ ¡Perfecto! Registrado precio de $${precioExtraido} para la orden de ${ordenActualizada.clientName}. Transmitido a la web.`,
-              );
-            } else {
-              await msg.reply(
-                `❌ No encontré ninguna orden activa vinculada a este mensaje.`,
-              );
-            }
-          } else {
-            await msg.reply(
-              `💡 Por favor, responde (manten presionando y dale a 'Responder') al mensaje del pedido para que sepa qué orden estás cotizando.`,
-            );
-          }
-        }
-      }
-    });
-
-    // 3. Evento por si falla la autenticación
     this.client.on('auth_failure', (msg) => {
       this.logger.error(`Error de autenticación: ${msg}`);
     });
 
-    // Arrancamos el proceso
-    this.client.initialize();
+    void this.client.initialize();
+  }
+
+  private handleReady(): void {
+    this.logger.log('¡El bot de WhatsApp está LISTO y conectado! 🚀');
+  }
+
+  private async handleOwnMessage(msg: Message): Promise<void> {
+    const texto = msg.body.trim();
+
+    if (!texto.startsWith('/precio')) return;
+
+    const coincidenciaPrecio = texto.match(/\/precio\s*(\d+)/);
+    if (!coincidenciaPrecio) return;
+
+    const precioExtraido = parseInt(coincidenciaPrecio[1], 10);
+    this.logger.log(`Monto cotizado encontrado: $${precioExtraido}`);
+
+    // 1. Verificar si el mensaje es una respuesta (reply) a otro mensaje
+    if (!msg.hasQuotedMsg) {
+      await msg.reply(
+        `💡 Por favor, responde (manten presionando y dale a 'Responder') al mensaje del pedido para que sepa qué orden estás cotizando.`,
+      );
+      return;
+    }
+
+    const msgCitado = await msg.getQuotedMessage();
+    const idMensajeOriginal = msgCitado.id._serialized; // El ID del mensaje que el bot mandó primero
+
+    this.logger.log(
+      `Buscando orden para el mensaje citado: ${idMensajeOriginal}`,
+    );
+
+    // 2. Buscamos y actualizamos la orden en Postgres con el precio real
+    const ordenActualizada = await this.orderService.updatePriceByMessageId(
+      idMensajeOriginal,
+      precioExtraido,
+    );
+
+    if (!ordenActualizada) {
+      await msg.reply(
+        `❌ No encontré ninguna orden activa vinculada a este mensaje.`,
+      );
+      return;
+    }
+
+    // 3. Emitimos el precio EN VIVO por WebSockets usando el ID REAL de la orden
+    this.chatGateway.server
+      .to(ordenActualizada.id.toString())
+      .emit('price_quoted', {
+        orderId: ordenActualizada.id,
+        price: ordenActualizada.deliveryPrice,
+        status: ordenActualizada.status,
+        mpLink: ordenActualizada.mpPreference,
+      });
+
+    this.logger.log(
+      `¡Transmitido con éxito al socket de la orden REAL: ${ordenActualizada.id}!`,
+    );
+    await msg.reply(
+      `✅ ¡Perfecto! Registrado precio de $${precioExtraido} para la orden de ${ordenActualizada.clientName}. Transmitido a la web.`,
+    );
   }
 
   /**
@@ -190,7 +158,8 @@ export class WhatsappService implements OnModuleInit {
    * Notifica a la operadora que entró un pedido nuevo y guarda el ID del mensaje en la orden.
    */
   async notifyNewOrder(order: Order): Promise<void> {
-    const numeroAmiga = '5492966572349';
+    const numeroAmiga = envs.operatorPhone;
+
     const mensajeParaAmiga =
       `📦 *¡NUEVO PEDIDO RECIBIDO!*\n\n` +
       `👤 *Cliente:* ${order.clientName}\n` +

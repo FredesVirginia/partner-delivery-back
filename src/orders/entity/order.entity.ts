@@ -2,11 +2,15 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { User } from '../../users/entity/user.entity';
 import { Message } from './message.entity';
-// import { ChatMessage } from '../../chat/entities/chat-message.entity'; // La enlazaremos pronto
+import { Exclude } from 'class-transformer';
+
 export enum OrderStatus {
   PENDING_QUOTATION = 'PENDING_QUOTATION',
   PENDING_PAYMENT = 'PENDING_PAYMENT',
@@ -19,6 +23,13 @@ export enum OrderStatus {
 export class Order {
   @PrimaryGeneratedColumn()
   id: number;
+
+  @ManyToOne(() => User, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
+  user: User;
+
+  @Column({ name: 'user_id', type: 'uuid' })
+  userId: string;
 
   @Column({ name: 'client_name', type: 'varchar' })
   clientName: string;
@@ -61,6 +72,7 @@ export class Order {
   @CreateDateColumn()
   createdAt: Date;
 
+  @Exclude()
   @Column({ name: 'whatsapp_message_id', type: 'varchar', nullable: true })
   whatsappMessageId: string;
 

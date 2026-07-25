@@ -3,25 +3,26 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  Index,
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
 import { Order } from './order.entity';
 
+@Index(['orderId', 'createdAt'])
 @Entity({ name: 'messages' })
 export class Message {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  // Relacionamos el mensaje con la orden a la que pertenece
-  @ManyToOne(() => Order, (order) => order.id, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Order, (order) => order.messages, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'order_id' })
   order: Order;
 
-  @Column({ name: 'order_id' })
-  orderId: string;
+  @Column({ name: 'order_id', type: 'int' })
+  orderId: number;
 
-  // Quién mandó el mensaje: 'CLIENT' (desde la web del cliente) o 'ADMIN' (tu amiga desde el panel)
+  // Quién mandó el mensaje: 'CLIENT' (desde la web del cliente) o 'ADMIN'
   @Column({ type: 'varchar', length: 20 })
   sender: 'CLIENT' | 'ADMIN';
 
@@ -30,4 +31,7 @@ export class Message {
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
+
+  @Column({ name: 'read_at', type: 'timestamp', nullable: true })
+  readAt: Date | null;
 }

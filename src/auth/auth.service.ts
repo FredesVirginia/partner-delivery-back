@@ -50,8 +50,11 @@ export class AuthService {
     const passwordHash = await argon2.hash(dto.password);
     const user = await this.usersService.create({
       email: dto.email,
-      firstName: dto.firstName,
-      lastName: dto.lastName,
+      userName: dto.userName,
+      address: dto.address,
+      phone: dto.phone,
+      neighborhood: dto.neighborhood,
+      location: dto.location,
       passwordHash,
       role: UserRole.CLIENT,
     });

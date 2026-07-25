@@ -1,5 +1,12 @@
-import { Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import {
+  Inject,
+  Logger,
+  UnauthorizedException,
+  forwardRef,
+} from '@nestjs/common';
+import { OrderService } from 'src/orders/order.service';
+
+import { JwtService } from '@nestjs/jwt';
 import {
   ConnectedSocket,
   MessageBody,
@@ -10,10 +17,19 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Message } from 'src/orders/entity/message.entity';
-import { Repository } from 'typeorm';
+import { JwtPayload } from 'src/auth/interfaces/jwt-payload.interface';
+import { describeError } from 'src/common/utils/error.util';
+import { envs } from 'src/config';
+import { User } from 'src/users/entity/user.entity';
+import { UsersService } from 'src/users/users.service';
 
-// El decorador configura el Gateway. Habilitamos CORS para que tu Front (React) pueda conectarse sin bloqueos.
+// Socket ya autenticado
+interface AuthSocketData {
+  user: User;
+}
+
+type AuthSocket = Socket<any, any, any, AuthSocketData>;
+
 @WebSocketGateway({
   cors: {
     origin: '*', // En producción cambiarás esto por la URL de tu cliente web
@@ -21,17 +37,51 @@ import { Repository } from 'typeorm';
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
-    @InjectRepository(Message)
-    private readonly messageRepository: Repository<Message>,
+    private readonly jwtService: JwtService,
+    private readonly usersService: UsersService,
+    @Inject(forwardRef(() => OrderService))
+    private readonly orderService: OrderService,
   ) {}
+
   @WebSocketServer()
   server: Server; // Esta variable nos da acceso a todo el servidor de Socket.io
 
   private readonly logger = new Logger(ChatGateway.name);
 
-  // Se ejecuta automáticamente cuando un cliente (Front) abre la página y se conecta
-  handleConnection(client: Socket) {
-    this.logger.log(`Cliente conectado al socket: ${client.id}`);
+  async handleConnection(client: AuthSocket) {
+    try {
+      const user = await this.authenticate(client);
+      client.data.user = user;
+      this.logger.log(`Cliente conectado: ${client.id} (${user.email})`);
+    } catch {
+      this.logger.warn(`Conexión rechazada por token inválido: ${client.id}`);
+      client.emit('auth_error', { message: 'Token inválido o ausente' });
+      client.disconnect(true);
+    }
+  }
+
+  private async authenticate(client: AuthSocket): Promise<User> {
+    const authToken = client.handshake.auth?.token as string | undefined;
+    const headerToken = client.handshake.headers.authorization?.replace(
+      'Bearer ',
+      '',
+    );
+    const token = authToken ?? headerToken;
+
+    if (!token) {
+      throw new UnauthorizedException('Falta el token');
+    }
+
+    const payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
+      secret: envs.jwtAccessSecret,
+    });
+
+    const user = await this.usersService.findById(payload.sub);
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('Usuario inexistente o inactivo');
+    }
+
+    return user;
   }
 
   // Se ejecuta cuando el cliente cierra la pestaña o pierde internet
@@ -39,52 +89,51 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.log(`Cliente desconectado: ${client.id}`);
   }
 
-  /**
-   * Evento para que el Front se una a la sala de su pedido
-   * El Front emitirá: socket.emit('join_order', { orderId: '...' })
-   */
   @SubscribeMessage('join_order')
-  handleJoinOrder(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { orderId: string },
+  async handleJoinOrder(
+    @ConnectedSocket() client: AuthSocket,
+    @MessageBody() data: { orderId: number },
   ) {
-    if (!data.orderId) return;
+    if (!data?.orderId) return;
 
-    // Metemos al cliente en la sala exclusiva de su UUID de orden
-    client.join(data.orderId);
-    this.logger.log(
-      `Cliente ${client.id} se unió a la sala de la orden: ${data.orderId}`,
-    );
+    const user = client.data.user;
+    const room = String(data.orderId);
 
-    // Le confirmamos al cliente que ya está adentro
-    client.emit('joined_room', { room: data.orderId });
+    try {
+      await this.orderService.findForUser(Number(data.orderId), user);
+    } catch {
+      this.logger.warn(
+        `${user.email} intentó entrar a la sala ${room} sin permiso`,
+      );
+      client.emit('join_error', {
+        orderId: data.orderId,
+        message: 'No tenés acceso a este chat',
+      });
+      return;
+    }
+
+    void client.join(room);
+    this.logger.log(`${user.email} se unió a la sala de la orden ${room}`);
+    client.emit('joined_room', { room });
   }
 
   @SubscribeMessage('send_message')
   async handleSendMessage(
-    @ConnectedSocket() client: Socket,
-    @MessageBody()
-    data: { orderId: any; sender: 'CLIENT' | 'ADMIN'; text: string },
+    @ConnectedSocket() client: AuthSocket,
+    @MessageBody() data: { orderId: number; text: string },
   ) {
-    try {
-      if (!data.orderId || !data.text) return;
-      //GUATDAMOS EL MENSAJE EN POSTGRESS
-      const saveMessage = await this.messageRepository.create({
-        orderId: data.orderId,
-        sender: data.sender,
-        text: data.text,
-      });
-      await this.messageRepository.save(saveMessage);
-      // 2. Le transmitimos el mensaje a TODOS los que estén sintonizando esa sala de la orden
-      // Esto incluye a la otra punta (si el cliente escribió, le llega al panel de tu amiga, y viceversa)
-      this.server.to(data.orderId.toString()).emit('new_message', saveMessage);
+    if (!data?.orderId || !data?.text) return;
 
-      this.logger.log(
-        `Mensaje de [${data.sender}] transmitido en sala ${data.orderId}`,
+    try {
+      await this.orderService.sendMessage(
+        Number(data.orderId),
+        client.data.user,
+        { text: data.text },
       );
     } catch (error) {
-      this.logger.error(error.message, error.stack);
-      throw error;
+      const { message, stack } = describeError(error);
+      this.logger.error(message, stack);
+      client.emit('message_error', { message: 'No se pudo enviar el mensaje' });
     }
   }
 }

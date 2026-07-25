@@ -6,8 +6,11 @@ import { UserRole } from '../enums/user-role.enum';
  */
 export interface CreateUserDto {
   email: string;
-  firstName: string;
-  lastName: string;
   passwordHash: string;
   role?: UserRole;
+  userName: string;
+  address: string;
+  phone: string;
+  neighborhood?: string;
+  location?: string;
 }

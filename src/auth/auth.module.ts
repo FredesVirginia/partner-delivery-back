@@ -15,8 +15,6 @@ import { JwtStrategy } from './strategies/jwt.strategy';
   imports: [
     UsersModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
-    // Los secretos/TTL se pasan explícitamente por firma (access vs refresh),
-    // así que registramos JwtModule sin opciones por defecto.
     JwtModule.register({}),
     TypeOrmModule.forFeature([RefreshToken]),
   ],

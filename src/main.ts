@@ -1,10 +1,15 @@
 import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { envs } from './config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.enableCors({
+    origin: envs.corsOrigins.length ? envs.corsOrigins : true,
+    credentials: true,
+  });
   // Valida los DTOs (class-validator) en todas las rutas y descarta props extra.
   app.useGlobalPipes(
     new ValidationPipe({

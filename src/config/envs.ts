@@ -2,6 +2,7 @@ import 'dotenv/config';
 import * as joi from 'joi';
 
 interface EnvVars {
+  CORS_ORIGINS?: string;
   DB_HOST: string;
   DB_PORT: number;
   MP_ACCESS_TOKEN: string;
@@ -13,10 +14,15 @@ interface EnvVars {
   JWT_REFRESH_SECRET: string;
   JWT_ACCESS_TTL: string;
   JWT_REFRESH_TTL: string;
+  OPERATOR_PHONE: string;
+  WA_DISABLED: boolean;
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_SUBJECT?: string;
 }
 
 const envsShema = joi
-  .object({
+  .object<EnvVars>({
     DB_HOST: joi.string().required(),
     DB_PORT: joi.number().required(),
     DB_USER: joi.string().required(),
@@ -31,18 +37,30 @@ const envsShema = joi
     JWT_REFRESH_SECRET: joi.string().required(),
     JWT_ACCESS_TTL: joi.string().default('15m'),
     JWT_REFRESH_TTL: joi.string().default('7d'),
+    CORS_ORIGINS: joi.string().optional(),
+    // Teléfono de la operadora que recibe los pedidos (sin '+' ni guiones).
+    OPERATOR_PHONE: joi.string().required(),
+    // true = arranca sin el bot de WhatsApp (sin Puppeteer ni QR).
+    WA_DISABLED: joi.boolean().default(false),
+    // Web Push (PWA). Opcionales: sin ellas la app arranca igual, solo que
+    // no manda notificaciones.
+    VAPID_PUBLIC_KEY: joi.string().optional(),
+    VAPID_PRIVATE_KEY: joi.string().optional(),
+    VAPID_SUBJECT: joi.string().optional(),
   })
   .unknown(true);
 
-const { error, value } = envsShema.validate({
+// No destructuramos: `validate` devuelve una unión (o hay error, o hay value).
+// Chequeando `result.error` primero, TypeScript sabe que `result.value` es EnvVars.
+const result = envsShema.validate({
   ...process.env,
 });
 
-if (error) {
-  throw new Error(`Config validation errors ${error.message}`);
+if (result.error) {
+  throw new Error(`Config validation errors ${result.error.message}`);
 }
 
-const envVars: EnvVars = value;
+const envVars = result.value;
 
 export const envs = {
   port: envVars.DB_PORT,
@@ -56,4 +74,13 @@ export const envs = {
   jwtRefreshSecret: envVars.JWT_REFRESH_SECRET,
   jwtAccessTtl: envVars.JWT_ACCESS_TTL,
   jwtRefreshTtl: envVars.JWT_REFRESH_TTL,
+  corsOrigins:
+    envVars.CORS_ORIGINS?.split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean) ?? [],
+  waDisabled: envVars.WA_DISABLED,
+  operatorPhone: envVars.OPERATOR_PHONE,
+  vapidPublicKey: envVars.VAPID_PUBLIC_KEY,
+  vapidPrivateKey: envVars.VAPID_PRIVATE_KEY,
+  vapidSubject: envVars.VAPID_SUBJECT,
 };
